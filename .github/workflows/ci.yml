@@ -1,0 +1,30 @@
+name: Pemeriksaan lokal tanpa deployment
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+      - run: npm ci --prefix server
+      - name: Generate Prisma tanpa koneksi database
+        run: npm --prefix server run generate
+        env:
+          DATABASE_URL: mysql://build-only.invalid/unused
+      - run: npm ci --prefix client
+      - run: npm --prefix server test
+      - run: npm --prefix client test
+      - run: npm --prefix client run lint
+      - run: npm --prefix client run build
+      # Suite MySQL/Playwright dijalankan di environment testing terpisah dengan guard.
+      # Workflow ini tidak memakai secret/cloud, melakukan migrasi, atau deploy.

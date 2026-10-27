@@ -1,0 +1,66 @@
+name: whylet
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: whylet
+      MYSQL_USER: ${MYSQL_USER:?Set akun aplikasi privat}
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_app
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root
+    secrets: [mysql_app, mysql_root]
+    volumes: ["mysql_data:/var/lib/mysql"]
+    healthcheck:
+      test: [CMD, mysqladmin, ping, -h, localhost]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks: [private]
+  migrate:
+    build:
+      context: ..
+      dockerfile: deploy/server.Dockerfile
+    env_file: .env.migrate
+    command: ["npm", "run", "migrate:deploy"]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [private]
+    profiles: [release]
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/server.Dockerfile
+    restart: unless-stopped
+    env_file: .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [private, edge]
+    # Tidak ada published port: trust proxy satu hop hanya untuk Caddy pada network ini.
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Set domain yang sudah disetujui}
+    ports: ["80:80", "443:443"]
+    volumes: ["caddy_data:/data", "caddy_config:/config"]
+    depends_on: [backend]
+    networks: [edge]
+secrets:
+  mysql_app:
+    file: ${MYSQL_APP_SECRET_FILE:?Set path secret privat}
+  mysql_root:
+    file: ${MYSQL_ROOT_SECRET_FILE:?Set path secret privat}
+volumes:
+  mysql_data:
+  caddy_data:
+  caddy_config:
+networks:
+  private:
+    internal: true
+  edge:

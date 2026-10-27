@@ -1,0 +1,239 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum WalletType {
+  CASH
+  BANK
+  EWALLET
+  OTHER
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum InputMethod {
+  MANUAL
+  TEXT
+  VOICE
+  RECEIPT
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model User {
+  id              String    @id @default(uuid()) @db.Char(36)
+  name            String    @db.VarChar(100)
+  email           String    @unique @db.VarChar(191)
+  passwordHash    String?   @map("password_hash") @db.VarChar(255)
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  authAccounts            AuthAccount[]
+  authSessions            AuthSession[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+  wallets                 Wallet[]
+  categories              Category[]
+  transactions            Transaction[]
+  transfers               Transfer[]
+  spendingLimit           SpendingLimit?
+  settings                UserSettings?
+  notifications           NotificationLog[]
+
+  @@map("users")
+}
+
+model Wallet {
+  id             String     @id @default(uuid()) @db.Char(36)
+  userId         String     @map("user_id") @db.Char(36)
+  name           String     @db.VarChar(100)
+  type           WalletType @default(CASH)
+  openingBalance Decimal    @default(0) @map("opening_balance") @db.Decimal(18, 2)
+  isDefault      Boolean    @default(false) @map("is_default")
+  isArchived     Boolean    @default(false) @map("is_archived")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+  transfersOut Transfer[]    @relation("TransferSource")
+  transfersIn  Transfer[]    @relation("TransferDestination")
+
+  @@index([userId])
+  @@map("wallets")
+}
+
+model Category {
+  id         String          @id @default(uuid()) @db.Char(36)
+  userId     String          @map("user_id") @db.Char(36)
+  name       String          @db.VarChar(100)
+  type       TransactionType
+  icon       String?         @db.VarChar(50)
+  isArchived Boolean         @default(false) @map("is_archived")
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  user         User          @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+
+  @@unique([userId, name, type])
+  @@index([userId])
+  @@map("categories")
+}
+
+model Transaction {
+  id              String          @id @default(uuid()) @db.Char(36)
+  userId          String          @map("user_id") @db.Char(36)
+  walletId        String          @map("wallet_id") @db.Char(36)
+  categoryId      String          @map("category_id") @db.Char(36)
+  type            TransactionType
+  amount          Decimal         @db.Decimal(18, 2)
+  description     String          @db.VarChar(255)
+  transactionDate DateTime        @map("transaction_date") @db.Date
+  inputMethod     InputMethod     @default(MANUAL) @map("input_method")
+  transferId      String?         @unique @map("transfer_id") @db.Char(36)
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  user        User      @relation(fields: [userId], references: [id])
+  wallet      Wallet    @relation(fields: [walletId], references: [id])
+  category    Category  @relation(fields: [categoryId], references: [id])
+  feeTransfer Transfer? @relation("TransferFee", fields: [transferId], references: [id], onDelete: SetNull)
+
+  @@index([userId, transactionDate])
+  @@index([walletId])
+  @@index([categoryId])
+  @@map("transactions")
+}
+
+model Transfer {
+  id           String   @id @default(uuid()) @db.Char(36)
+  userId       String   @map("user_id") @db.Char(36)
+  fromWalletId String   @map("from_wallet_id") @db.Char(36)
+  toWalletId   String   @map("to_wallet_id") @db.Char(36)
+  amount       Decimal  @db.Decimal(18, 2)
+  fee          Decimal  @default(0) @db.Decimal(18, 2)
+  transferDate DateTime @map("transfer_date") @db.Date
+  note         String?  @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user           User         @relation(fields: [userId], references: [id])
+  fromWallet     Wallet       @relation("TransferSource", fields: [fromWalletId], references: [id])
+  toWallet       Wallet       @relation("TransferDestination", fields: [toWalletId], references: [id])
+  feeTransaction Transaction? @relation("TransferFee")
+
+  @@index([userId, transferDate])
+  @@index([fromWalletId])
+  @@index([toWalletId])
+  @@map("transfers")
+}
+
+model SpendingLimit {
+  id                String   @id @default(uuid()) @db.Char(36)
+  userId            String   @unique @map("user_id") @db.Char(36)
+  amount            Decimal  @db.Decimal(18, 2)
+  isEnabled         Boolean  @default(false) @map("is_enabled")
+  emailNotification Boolean  @default(false) @map("email_notification")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("spending_limits")
+}
+
+model UserSettings {
+  id       String @id @default(uuid()) @db.Char(36)
+  userId   String @unique @map("user_id") @db.Char(36)
+  currency String @default("IDR") @db.VarChar(3)
+  timezone String @default("Asia/Jakarta") @db.VarChar(60)
+  theme    String @default("system") @db.VarChar(20)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("user_settings")
+}
+
+model NotificationLog {
+  id        String             @id @default(uuid()) @db.Char(36)
+  userId    String             @map("user_id") @db.Char(36)
+  period    String             @db.Char(7)
+  threshold Int
+  status    NotificationStatus @default(PENDING)
+  sentAt    DateTime?          @map("sent_at")
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, period, threshold])
+  @@map("notification_logs")
+}
+
+model AuthAccount {
+  id                String   @id @default(uuid()) @db.Char(36)
+  userId            String   @map("user_id") @db.Char(36)
+  provider          String   @db.VarChar(30)
+  providerAccountId String   @map("provider_account_id") @db.VarChar(191)
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@unique([userId, provider])
+  @@index([userId])
+  @@map("auth_accounts")
+}
+
+model AuthSession {
+  id        String    @id @default(uuid()) @db.Char(36)
+  userId    String    @map("user_id") @db.Char(36)
+  csrfNonce String    @map("csrf_nonce") @db.Char(64)
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("auth_sessions")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Char(36)
+  userId    String    @map("user_id") @db.Char(36)
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Char(36)
+  userId    String    @map("user_id") @db.Char(36)
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}

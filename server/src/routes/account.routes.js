@@ -1,0 +1,11 @@
+import { Router } from "express";
+import { requireAuth } from "../middleware/auth.middleware.js";
+import { requireCsrf } from "../middleware/csrf.middleware.js";
+import { authRateLimit } from "../middleware/auth-rate-limit.middleware.js";
+import { show, update, changePassword } from "../controllers/account.controller.js";
+const router = Router();
+router.use(requireAuth, requireCsrf);
+router.get("/", show);
+router.patch("/", update);
+router.patch("/password", authRateLimit, changePassword);
+export default router;

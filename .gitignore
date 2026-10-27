@@ -1,0 +1,89 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment & Secrets
+.env
+.env.*
+
+# Build
+dist/
+build/
+coverage/
+.vite/
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Temporary files
+*.tmp
+*.bak
+
+# Local database
+*.db
+*.sqlite
+*.sqlite3
+# Laporan lokal tes database (fixture sintetis)
+server/tests/integration/results/
+
+# Artefak browser lokal (tanpa trace/video)
+client/e2e-results/
+client/playwright-report/
+client/test-results/
+
+# Secret lokal, backup finansial, sertifikat dan profil browser
+secrets/
+backups/
+*.pem
+*.key
+*.p12
+*.pfx
+*.cnf
+*.sql.gz
+*.sql.gz.age
+*.dump
+credentials*.json
+service-account*.json
+storageState*.json
+
+# Dump SQL privat; migration tetap masuk version control.
+*.sql
+!server/prisma/migrations/**/migration.sql
+*.ibd
+*.frm
+.aws/
+.codex/
+
+# Cookie jar dan material sesi lokal (aturan tidak menghapus riwayat tracked)
+*cookies*.txt
+*.cookies
+cookie-jar*
+*.har
+*.trace.zip
+
+# Dokumen internal tidak menjadi bagian repository publik
+docs/qa/
+docs/PROJECT-COMPLETION.md
+docs/GITHUB-RELEASE-PREPARATION.md
+
+# Kebijakan publikasi final: tanpa environment, Markdown internal, atau screenshot
+**/.env
+**/.env.*
+*.md
+!/README.md
+docs/
+**/screenshots/
+**/screenshot*/
+**/failure-*.png
+server/.demo-results/
